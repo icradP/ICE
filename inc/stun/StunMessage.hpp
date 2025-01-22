@@ -507,7 +507,7 @@ struct StunAttribute {
   }
 };
 
-std::vector<StunAttribute> makeAttributes(const uint8_t* data, size_t length) {
+static std::vector<StunAttribute> makeAttributes(const uint8_t* data, size_t length) {
   std::vector<StunAttribute> attributes;
   size_t offset = 0;
   while (offset + 4 <= length) {
@@ -546,14 +546,14 @@ struct AttributeValueStrVisitor {
   std::string operator()(const std::monostate&) const { return "EMPTY"; }
 };
 
-std::string AttributeValue2str(const AttributeValue& attrvalue) {
+static std::string AttributeValue2str(const AttributeValue& attrvalue) {
   return std::visit(AttributeValueStrVisitor{}, attrvalue);
 }
 // XOR-MAPPED-ADDRESS, XOR-PEER-ADDRESS, XOR-RELAYED-ADDRESS
 // xor_addr = addr ^ magic_cookie
 // xor_port = port ^ (magic_cookie >> 16)
 // RFC 5389 : 15.2 XOR-MAPPED-ADDRESS : avoid middlebox filtering
-std::pair<std::string, uint16_t> getXorAddr(const StunAttribute& attr) {
+static std::pair<std::string, uint16_t> getXorAddr(const StunAttribute& attr) {
   char ip[INET6_ADDRSTRLEN];
   uint16_t port;
   if (attr.type == AttributeType::XOR_MAPPED_ADDRESS ||
