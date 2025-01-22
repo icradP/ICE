@@ -117,6 +117,47 @@ static const std::unordered_map<int, std::string> stunMessageErrCodeEnumMap = {
 };
 
 
+// REQUESTED-TRANSPORT
+
+//    This attribute is used by the client to request a specific transport
+//    protocol for the allocated transport address.  The value of this
+//    attribute is 4 bytes with the following format:
+//       0                   1                   2                   3
+//       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//      |    Protocol   |                    RFFU                       |
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+//    The Protocol field specifies the desired protocol.  The codepoints
+//    used in this field are taken from those allowed in the Protocol field
+//    in the IPv4 header and the NextHeader field in the IPv6 header
+//    [Protocol-Numbers](https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml#protocol-numbers-1). 
+//    This specification only allows the use of codepoint 17 (User Datagram Protocol).
+
+//    The RFFU field MUST be set to zero on transmission and MUST be
+//    ignored on reception.  It is reserved for future uses.
+
+enum ProtocolTransport:uint8_t{
+  TCP = 6,
+  UDP = 17
+};
+static const std::string_view ProtocolTransportEnum2str(ProtocolTransport num){
+  switch (num) {
+    case TCP: return "TCP";
+    case UDP: return "UDP";
+    default: return "ERROR-NUM";
+  }
+}
+
+static std::vector<uint8_t> makeRequestTransport(ProtocolTransport num){
+  std::vector<uint8_t> test(4,0);
+  test[0]= num;
+  return test;
+}
+static ProtocolTransport parseRequestTransport(std::vector<uint8_t> test){
+  return static_cast<ProtocolTransport>(test[0]);
+}
+
 static std::string StunMessageErrCodeEnum2str(StunMessageErrCodeEnum code) {
   auto it = stunMessageErrCodeEnumMap.find(static_cast<int>(code));
   if (it != stunMessageErrCodeEnumMap.end()) {
@@ -396,6 +437,16 @@ struct StunAttribute {
         value(std::move(value)),
         padding(padding) {}
 
+
+  StunAttribute(AttributeType type, const char* value,
+                uint16_t padding = 0)
+      : type(type),
+        length(static_cast<uint16_t>(std::strlen(value))),
+        value(reinterpret_cast<const uint8_t*>(value), reinterpret_cast<const uint8_t*>(value) + std::strlen(value)),
+        padding(padding) {
+          this->value.assign(reinterpret_cast<const uint8_t*>(value), reinterpret_cast<const uint8_t*>(value) + std::strlen(value));
+        }
+
   StunAttribute(AttributeType type, const StunMessageErrorCode& value)
       : type(type),
         padding(0) {
@@ -406,6 +457,16 @@ struct StunAttribute {
       : type(type),
         padding(0), length(size) {
           this->value.assign(value, value + size);
+        }
+  
+    StunAttribute(AttributeType type, uint32_t num,
+                uint16_t padding = 0)
+      : type(type),
+        length(static_cast<uint16_t>(sizeof(uint32_t))),
+        value(),
+        padding(padding) {
+          uint32_t networkOrderNum = htonl(num);
+          value.assign(reinterpret_cast<uint8_t*>(&networkOrderNum), reinterpret_cast<uint8_t*>(&networkOrderNum) + sizeof(networkOrderNum));
         }
 
   std::vector<uint8_t> serialize() const {
@@ -528,7 +589,45 @@ std::pair<std::string, uint16_t> getXorAddr(const StunAttribute& attr) {
   return std::make_pair(std::string(ip), port);
 }
 
-AttributeValue parseAttribute2Variant(const StunAttribute& attr) {
+static std::vector<uint8_t> makeIpPortVector(const std::string& ip, uint16_t port, bool isXor=false) {
+  std::vector<uint8_t> result;
+  sockaddr_storage addr;
+  socklen_t addr_len = sizeof(addr);
+  if (inet_pton(AF_INET, ip.c_str(), &(((sockaddr_in*)&addr)->sin_addr))) {
+    addr.ss_family = AF_INET;
+    ((sockaddr_in*)&addr)->sin_port = htons(port);
+    result.resize(8);
+    result[1] = 1;  // IPv4
+    memcpy(result.data() + 2, &((sockaddr_in*)&addr)->sin_port, 2);
+    memcpy(result.data() + 4, &((sockaddr_in*)&addr)->sin_addr, 4);
+  } else if (inet_pton(AF_INET6, ip.c_str(), &(((sockaddr_in6*)&addr)->sin6_addr))) {
+    addr.ss_family = AF_INET6;
+    ((sockaddr_in6*)&addr)->sin6_port = htons(port);
+    result.resize(20);
+    result[1] = 2;  // IPv6
+    memcpy(result.data() + 2, &((sockaddr_in6*)&addr)->sin6_port, 2);
+    memcpy(result.data() + 4, &((sockaddr_in6*)&addr)->sin6_addr, 16);
+  } else {
+    throw std::runtime_error("Invalid IP address: " + ip);
+  }
+
+  if (isXor) {
+    uint16_t* portPtr = reinterpret_cast<uint16_t*>(result.data() + 2);
+    *portPtr = htons(ntohs(*portPtr) ^ 0x2112);
+    if (result[1] == 1) {  // IPv4
+      uint32_t* addrPtr = reinterpret_cast<uint32_t*>(result.data() + 4);
+      *addrPtr = htonl(ntohl(*addrPtr) ^ 0x2112A442);
+    } else if (result[1] == 2) {  // IPv6
+      for (int i = 0; i < 16; ++i) {
+        result[4 + i] ^= magicCookie[i % 4];
+      }
+    }
+  }
+  return result;
+}
+
+
+static AttributeValue parseAttribute2Variant(const StunAttribute& attr) {
   auto it = attributeValueTypeMap.find(attr.type);
   if (it == attributeValueTypeMap.end()) {
     throw std::runtime_error("Unknown attribute type");
@@ -603,16 +702,6 @@ class StunMessage {
  public:
   StunMessage(StunHeader header, std::vector<uint8_t> data)
       : _header(std::move(header)), _data(std::move(data)) {}
-
-  StunMessage(
-      MessageType messageType,
-      std::initializer_list<std::pair<AttributeType, std::vector<uint8_t>>>
-          attributes)
-      : _header{messageType, 0, 0x2112A442, {0}} {
-    for (const auto& attr : attributes) {
-      addAttribute(attr.first, attr.second);
-    }
-  }
 
   StunMessage(const StunMessage&) = default;
   StunMessage(StunMessage&&) = default;
