@@ -10,7 +10,6 @@
 #include <vector>
 
 
-
 int main(int argc, char** argv) {
   // return test_serialize();
   return 0;
