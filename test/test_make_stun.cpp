@@ -5,10 +5,10 @@
 #include <cstdint>
 #include <iostream>
 #include <stdexcept>
-#include <string>
 #include <vector>
 
-#include "stun/StunMessage.hpp"
+#include "stun/Stun.h"
+
 
 using namespace std;
 using namespace stun;
@@ -72,7 +72,6 @@ int makeStunMsgTest() {
   stunmsg_2.addAttribute(transport);
   buffers.push_back(stunmsg_2.serialize());
 
-  // TODO: address serialize ddeserialize
   auto stunmsg_3 =
       makeStunMessage(MessageType::BINDING_RESPONSE, transactionID);
   std::vector<uint8_t> ipport = makeIpPortVector("183.238.245.122", 53940);

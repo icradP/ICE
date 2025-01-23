@@ -158,15 +158,7 @@ int test_exposer() {
                                     .Help("Number of HTTP requests")
                                     .Register(*registry);
 
-// # HELP media_list_detail getMediaList detail metric
-  // # TYPE media_list_detail gauge
-  // media_list_detail{Encodeinfo="H264/mpeg4-generic",aliveSecond="16",bytesSpeed="78.22KB/s",channel="1",createStamp="2025-01-20
-  // 18:42:06",originTypeStr="rtp_push",originUrl="rtp://__defaultVhost__/1/865123123123121",peer_ip="172.26.2.1",peer_port="6781",readerCount="0",stream="865123123123121",totalReaderCount="0"}
-  // 1
-  // media_list_detail{Encodeinfo="mpeg4-generic/H265",aliveSecond="12",bytesSpeed="39.06KB/s",channel="1",createStamp="2025-01-20
-  // 18:42:10",originTypeStr="rtp_push",originUrl="rtp://__defaultVhost__/1/865235054918335",peer_ip="172.26.2.1",peer_port="6789",readerCount="0",stream="865235054918335",totalReaderCount="0"}
-  // 1
-
+  // # HELP media_list_detail getMediaList detail metric
   auto& media_list_detail_gauge =
       BuildGauge()
           .Name("media_list_detail")

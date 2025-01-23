@@ -7,7 +7,8 @@
 #include <string>
 #include <vector>
 
-#include "stun/StunMessage.hpp"
+#include "stun/Stun.h"
+
 
 using namespace std;
 using namespace stun;
