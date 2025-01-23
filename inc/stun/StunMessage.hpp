@@ -429,7 +429,12 @@ struct StunAttribute {
   uint16_t length;
   std::vector<uint8_t> value;
   uint16_t padding = 0;
+  StunAttribute()=default;
+  StunAttribute(const StunAttribute& s)=default;
+  ~StunAttribute()=default;
 
+
+  
   StunAttribute(AttributeType type, std::vector<uint8_t> value,
                 uint16_t padding = 0)
       : type(type),
@@ -698,7 +703,7 @@ class StunMessage {
  private:
   StunHeader _header;
   std::vector<uint8_t> _data;
-
+  std::unordered_map<AttributeType, StunAttribute> _attributeMap;
  public:
   StunMessage(StunHeader header, std::vector<uint8_t> data)
       : _header(std::move(header)), _data(std::move(data)) {}
@@ -711,11 +716,24 @@ class StunMessage {
 
   StunMessage& operator<<(const StunAttribute& attr) {
     addAttribute(attr.type, attr.value);
+    _attributeMap[attr.type] = attr;
     return *this;
   }
  StunMessage& addAttribute(const StunAttribute& attr) {
     addAttribute(attr.type, attr.value);
+    _attributeMap[attr.type] = attr;
     return *this;
+  }
+  
+  bool findAttribute(AttributeType type) {
+    if(_data.empty())return false;
+    if(_attributeMap.empty()){
+      auto attributes = makeAttributes(_data.data(), _data.size());
+      for (auto& attr:attributes) {
+          _attributeMap[attr.type] = attr;
+      }
+    }
+    return _attributeMap.find(type) != _attributeMap.end();
   }
 
   const uint8_t* headerData() const {
