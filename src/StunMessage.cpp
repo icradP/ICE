@@ -1,7 +1,11 @@
 #include "stun/StunMessage.h"
-#include <stdexcept>
-#include "stun/StunAttribute.h"
+
 #include <netinet/in.h>
+
+#include <random>
+#include <stdexcept>
+
+#include "stun/StunAttribute.h"
 using namespace std;
 namespace stun {
 
@@ -28,6 +32,10 @@ StunMessage makeStunMessage(MessageType type, const uint8_t* transactionID) {
   memcpy(header.transactionID, transactionID, 12);
   return StunMessage(std::move(header), std::vector<uint8_t>());
 }
+StunMessage makeStunMessage(MessageType type,
+                            const std::vector<uint8_t> transactionID) {
+  return makeStunMessage(type, transactionID.data());
+}
 
 StunMessage makeStunMessage(const uint8_t* buffer, size_t length) {
   if (length < sizeof(StunHeader))
@@ -38,8 +46,16 @@ StunMessage makeStunMessage(const uint8_t* buffer, size_t length) {
   memcpy(&header, buffer, sizeof(StunHeader));
   uint16_t rawType = (uint16_t)header.messageType;
   header.messageType = (MessageType)((rawType >> 8) | (rawType << 8));
-  std::vector<uint8_t> data(buffer + sizeof(StunHeader), buffer + length);
+  std::vector<uint8_t> data(
+      buffer + sizeof(StunHeader),
+      buffer + sizeof(StunHeader) + ntohs(header.messageLength));
   return StunMessage(std::move(header), std::move(data));
+}
+
+StunMessage makeStunMessage(const std::vector<uint8_t> bufv) {
+  auto length = bufv.size();
+  const auto buffer = bufv.data();
+  return (makeStunMessage(buffer, length));
 }
 
 StunMessage::StunMessage(StunHeader header, std::vector<uint8_t> data)
@@ -108,6 +124,17 @@ void StunMessage::addAttribute(AttributeType type, std::vector<uint8_t> value) {
   _data.insert(_data.end(), serialized.begin(), serialized.end());
   _header.messageLength =
       htons(ntohs(_header.messageLength) + serialized.size());
+}
+
+std::vector<uint8_t> generateTransactionId(size_t length) {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<int> dis(0, 255);
+  std::vector<uint8_t> transactionId(length);
+  for (auto& byte : transactionId) {
+    byte = static_cast<uint8_t>(dis(gen));
+  }
+  return transactionId;
 }
 
 }  // namespace stun

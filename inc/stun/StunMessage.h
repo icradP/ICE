@@ -51,12 +51,13 @@ class StunMessage {
   void addAttribute(AttributeType type, std::vector<uint8_t> value);
 };
 
- std::string MessageType2str(MessageType type);
- bool isStunMessage(const uint8_t* data, size_t len);
- StunMessage makeStunMessage(const uint8_t* buffer, size_t length);
- StunMessage makeStunMessage(MessageType type,
-                                   const uint8_t* transactionID);
-
+std::string MessageType2str(MessageType type);
+bool isStunMessage(const uint8_t* data, size_t len);
+StunMessage makeStunMessage(const uint8_t* buffer, size_t length);
+StunMessage makeStunMessage(MessageType type, const uint8_t* transactionID);
+StunMessage makeStunMessage(MessageType type, const std::vector<uint8_t> transactionID);
+StunMessage makeStunMessage(const std::vector<uint8_t> bufv);
+std::vector<uint8_t> generateTransactionId(size_t length = 12);
 }  // namespace stun
 
 #endif  // STUN_HPP
