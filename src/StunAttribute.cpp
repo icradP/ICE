@@ -1,7 +1,9 @@
-#include <sstream>
+#include "stun/StunAttribute.h"
+
 #include <arpa/inet.h>
 
-#include "stun/StunAttribute.h"
+#include <sstream>
+
 #include "stun/StunUtils.h"
 
 namespace stun {
@@ -44,7 +46,7 @@ std::string AttributeValueStrVisitor::operator()(const std::monostate&) const {
   return "EMPTY";
 }
 
- const std::string_view ProtocolTransportEnum2str(ProtocolTransport num) {
+const std::string_view ProtocolTransportEnum2str(ProtocolTransport num) {
   switch (num) {
     case TCP:
       return "TCP";
@@ -54,28 +56,28 @@ std::string AttributeValueStrVisitor::operator()(const std::monostate&) const {
       return "ERROR-NUM";
   }
 }
-std::string  AttributeType2str(AttributeType type) {
+std::string AttributeType2str(AttributeType type) {
   auto it = attributeTypeMap.find(type);
   if (it != attributeTypeMap.end()) {
     return it->second;
   }
   return "UNKNOWN";
 }
- std::string AttributeValue2str(const AttributeValue& attrvalue) {
+std::string AttributeValue2str(const AttributeValue& attrvalue) {
   return std::visit(AttributeValueStrVisitor{}, attrvalue);
 }
 
- std::vector<uint8_t> makeRequestTransport(ProtocolTransport num) {
+std::vector<uint8_t> makeRequestTransport(ProtocolTransport num) {
   std::vector<uint8_t> test(4, 0);
   test[0] = num;
   return test;
 }
 
- ProtocolTransport parseRequestTransport(std::vector<uint8_t> test) {
+ProtocolTransport parseRequestTransport(std::vector<uint8_t> test) {
   return static_cast<ProtocolTransport>(test[0]);
 }
 
- std::string StunMessageErrCodeEnum2str(StunMessageErrCodeEnum code) {
+std::string StunMessageErrCodeEnum2str(StunMessageErrCodeEnum code) {
   auto it = stunMessageErrCodeEnumMap.find(static_cast<int>(code));
   if (it != stunMessageErrCodeEnumMap.end()) {
     return it->second;
@@ -83,8 +85,7 @@ std::string  AttributeType2str(AttributeType type) {
   return "UNKNOWN";
 }
 
- std::vector<uint8_t> StunMessageErrCodeEnum2value(
-    StunMessageErrCodeEnum code) {
+std::vector<uint8_t> StunMessageErrCodeEnum2value(StunMessageErrCodeEnum code) {
   auto it = stunMessageErrCodeEnumMap.find(static_cast<int>(code));
   if (it != stunMessageErrCodeEnumMap.end()) {
     return std::vector<uint8_t>(it->second.begin(), it->second.end());
@@ -93,8 +94,7 @@ std::string  AttributeType2str(AttributeType type) {
   return std::vector<uint8_t>(unknown.begin(), unknown.end());
 }
 
- StunMessageErrorCode makeStunMessageErrorCode(
-    StunMessageErrCodeEnum code) {
+StunMessageErrorCode makeStunMessageErrorCode(StunMessageErrCodeEnum code) {
   StunMessageErrorCode error;
   error.reserved = 0;  // default = 0
   error.err_class = static_cast<uint8_t>(static_cast<int>(code) / 100);
@@ -103,10 +103,9 @@ std::string  AttributeType2str(AttributeType type) {
   return error;
 }
 
- StunMessageErrorCode makeStunMessageErrorCode(const uint8_t* data,
-                                                     size_t len) {
+StunMessageErrorCode makeStunMessageErrorCode(const uint8_t* data, size_t len) {
   if (len < 4) {
-    throw std::runtime_error("Invalid STUN error message");
+    throw StunException("Invalid STUN error message");
   }
   StunMessageErrorCode error;
   error.reserved = ntohs(*reinterpret_cast<const uint16_t*>(data));
@@ -118,7 +117,7 @@ std::string  AttributeType2str(AttributeType type) {
   return error;
 }
 
- std::vector<uint8_t> serializeStunMessageErrorCode(
+std::vector<uint8_t> serializeStunMessageErrorCode(
     const StunMessageErrorCode& error) {
   std::vector<uint8_t> data;
   uint16_t reservedNetworkOrder = htons(error.reserved);
@@ -131,14 +130,13 @@ std::string  AttributeType2str(AttributeType type) {
   return data;
 }
 
- StunMessageErrCodeEnum getStunMessageErrCodeEnum(
+StunMessageErrCodeEnum getStunMessageErrCodeEnum(
     const StunMessageErrorCode& error) {
   return static_cast<StunMessageErrCodeEnum>(error.err_class * 100 +
                                              error.err_code);
 }
 
- std::vector<StunAttribute> makeAttributes(const uint8_t* data,
-                                                 size_t length) {
+std::vector<StunAttribute> makeAttributes(const uint8_t* data, size_t length) {
   std::vector<StunAttribute> attributes;
   size_t offset = 0;
   while (offset + 4 <= length) {
@@ -149,8 +147,8 @@ std::string  AttributeType2str(AttributeType type) {
   return attributes;
 }
 
- std::vector<uint8_t> makeIpPortVector(const std::string& ip,
-                                             uint16_t port, bool isXor) {
+std::vector<uint8_t> makeIpPortVector(const std::string& ip, uint16_t port,
+                                      bool isXor) {
   std::vector<uint8_t> result;
   sockaddr_storage addr;
   socklen_t addr_len = sizeof(addr);
@@ -170,7 +168,7 @@ std::string  AttributeType2str(AttributeType type) {
     memcpy(result.data() + 2, &((sockaddr_in6*)&addr)->sin6_port, 2);
     memcpy(result.data() + 4, &((sockaddr_in6*)&addr)->sin6_addr, 16);
   } else {
-    throw std::runtime_error("Invalid IP address: " + ip);
+    throw StunException("Invalid IP address: " + ip);
   }
 
   if (isXor) {
@@ -188,34 +186,29 @@ std::string  AttributeType2str(AttributeType type) {
   return result;
 }
 
- AttributeValue parseAttribute2Variant(const StunAttribute& attr) {
+AttributeValue parseAttribute2Variant(const StunAttribute& attr) {
   auto it = attributeValueTypeMap.find(attr.type);
   if (it == attributeValueTypeMap.end()) {
-    throw std::runtime_error("Unknown attribute type");
+    throw StunException("Unknown attribute type");
   }
 
   switch (it->second) {
     case AttributeValueType::STRING:
       return std::string(attr.value.begin(), attr.value.end());
     case AttributeValueType::UINT32:
-      if (attr.value.size() != 4)
-        throw std::runtime_error("Invalid UINT32 size");
+      if (attr.value.size() != 4) throw StunException("Invalid UINT32 size");
       return ntohl(*reinterpret_cast<const uint32_t*>(attr.value.data()));
     case AttributeValueType::UINT64:
-      if (attr.value.size() != 8)
-        throw std::runtime_error("Invalid UINT64 size");
+      if (attr.value.size() != 8) throw StunException("Invalid UINT64 size");
       return ntohll(*reinterpret_cast<const uint64_t*>(attr.value.data()));
     case AttributeValueType::UINT16:
-      if (attr.value.size() != 2)
-        throw std::runtime_error("Invalid UINT16 size");
+      if (attr.value.size() != 2) throw StunException("Invalid UINT16 size");
       return ntohs(*reinterpret_cast<const uint16_t*>(attr.value.data()));
     case AttributeValueType::UINT8:
-      if (attr.value.size() != 1)
-        throw std::runtime_error("Invalid UINT8 size");
+      if (attr.value.size() != 1) throw StunException("Invalid UINT8 size");
       return attr.value[0];
     case AttributeValueType::SOCKADDR: {
-      if (attr.value.size() < 4)
-        throw std::runtime_error("Invalid SOCKADDR size");
+      if (attr.value.size() < 4) throw StunException("Invalid SOCKADDR size");
       char ip[INET6_ADDRSTRLEN];
       uint16_t port;
       if (attr.value[1] == 1) {  // IPv4
@@ -229,7 +222,7 @@ std::string  AttributeType2str(AttributeType type) {
         inet_ntop(AF_INET6, &addr.sin6_addr, ip, sizeof(ip));
         port = ntohs(*reinterpret_cast<const uint16_t*>(attr.value.data() + 2));
       } else {
-        throw std::runtime_error("Unknown address family");
+        throw StunException("Unknown address family");
       }
       return std::make_pair(std::string(ip), port);
     }
@@ -251,11 +244,11 @@ std::string  AttributeType2str(AttributeType type) {
     case AttributeValueType::EMPTY:
       return std::monostate{};
     default:
-      throw std::runtime_error("Unknown attribute value type");
+      throw StunException("Unknown attribute value type");
   }
 }
 
- std::pair<std::string, uint16_t> getXorAddr(const StunAttribute& attr) {
+std::pair<std::string, uint16_t> getXorAddr(const StunAttribute& attr) {
   char ip[INET6_ADDRSTRLEN];
   uint16_t port;
   if (attr.type == AttributeType::XOR_MAPPED_ADDRESS ||
@@ -283,10 +276,35 @@ std::string  AttributeType2str(AttributeType type) {
       inet_ntop(AF_INET6, &addr.sin6_addr, ip, sizeof(ip));
       port = xorPort;
     } else {
-      throw std::runtime_error("Unknown address family");
+      throw StunException("Unknown address family");
     }
   } else {
-    throw std::runtime_error("Not XOR address");
+    throw StunException("Not XOR address");
+  }
+  return std::make_pair(std::string(ip), port);
+}
+
+std::pair<std::string, uint16_t> getAddr(const StunAttribute& attr) {
+  char ip[INET6_ADDRSTRLEN];
+  uint16_t port;
+  uint16_t xorPort =
+      ntohs(*reinterpret_cast<const uint16_t*>(attr.value.data() + 2));
+  if (attr.value[1] == 1) {  // IPv4
+    struct sockaddr_in addr;
+    uint32_t xorAddr;
+    memcpy(&xorAddr, attr.value.data() + 4, 4);
+    memcpy(&addr.sin_addr, &xorAddr, 4);
+    inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
+    port = xorPort;
+  } else if (attr.value[1] == 2) {  // IPv6
+    struct sockaddr_in6 addr;
+    uint8_t xorAddr[16];
+    memcpy(xorAddr, attr.value.data() + 4, 16);
+    memcpy(&addr.sin6_addr, xorAddr, 16);
+    inet_ntop(AF_INET6, &addr.sin6_addr, ip, sizeof(ip));
+    port = xorPort;
+  } else {
+    throw StunException("Unknown address family");
   }
   return std::make_pair(std::string(ip), port);
 }
@@ -348,9 +366,9 @@ std::vector<uint8_t> StunAttribute::serialize() const {
   return result;
 }
 
- StunAttribute deserialize(const uint8_t* data, size_t length) {
+StunAttribute deserialize(const uint8_t* data, size_t length) {
   if (length < 4) {
-    throw std::runtime_error("Buffer too small for STUN attribute");
+    throw StunException("Buffer too small for STUN attribute");
   }
   AttributeType type = static_cast<AttributeType>(
       ntohs(*reinterpret_cast<const uint16_t*>(data)));
@@ -366,7 +384,7 @@ std::vector<uint8_t> StunAttribute::serialize() const {
     //   oss << "Buffer too small for STUN attribute value: Attribute type("
     //       << dumphex(data, sizeof(uint16_t)) << "):" <<
     //       AttributeType2str(type);
-    throw std::runtime_error(oss.str());
+    throw StunException(oss.str());
   }
   std::vector<uint8_t> value(data + 4, data + 4 + attrLength);
   return StunAttribute(type, std::move(value), padding);

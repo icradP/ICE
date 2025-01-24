@@ -1,5 +1,5 @@
 #include "stun/StunMessage.h"
-
+#include "stun/StunUtils.h"
 #include <netinet/in.h>
 
 #include <random>
@@ -104,7 +104,7 @@ StunAttribute StunMessage::getAttribute(AttributeType type) const {
       return attr;
     }
   }
-  throw std::runtime_error("Attribute not found");
+  throw StunException("Attribute not found");
 }
 
 std::vector<StunAttribute> StunMessage::getAttributes() const {

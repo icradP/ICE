@@ -11,12 +11,30 @@
 namespace stun {
 
 class StunAttribute;
+
+// All STUN messages MUST start with a 20-byte header followed by zero
+//    or more Attributes.  The STUN header contains a STUN message type,
+//    magic cookie, transaction ID, and message length.
+
+//        0                   1                   2                   3
+//        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+//       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//       |0 0|     STUN Message Type     |         Message Length        |
+//       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//       |                         Magic Cookie                          |
+//       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//       |                                                               |
+//       |                     Transaction ID (96 bits)                  |
+//       |                                                               |
+//       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
 struct StunHeader {
   MessageType messageType;
   uint16_t messageLength;
   uint32_t magicCookie;
   uint8_t transactionID[12];
 };
+
 
 class StunMessage {
  private:

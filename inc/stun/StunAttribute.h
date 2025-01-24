@@ -67,6 +67,7 @@ std::vector<StunAttribute> makeAttributes(const uint8_t* data, size_t length);
 // xor_port = port ^ (magic_cookie >> 16)
 // RFC 5389 : 15.2 XOR-MAPPED-ADDRESS : avoid middlebox filtering
 std::pair<std::string, uint16_t> getXorAddr(const StunAttribute& attr);
+std::pair<std::string, uint16_t> getAddr(const StunAttribute& attr);
 std::vector<uint8_t> makeIpPortVector(const std::string& ip, uint16_t port,
                                       bool isXor = false);
 AttributeValue parseAttribute2Variant(const StunAttribute& attr);
